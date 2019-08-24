@@ -1,4 +1,4 @@
-function [tableTemplate, hitsIdx, missIdx, allTrials, sessionNum, retTrigger, encTrigger] = loadLogs(p2d)
+function [encSpiketimes_cueLocked, encSpiketimes_respLocked, retSpiketimes_cueLocked, retSpiketimes_respLocked, hitsIdx, missIdx, allTrials, sessionNum, retTrigger, encTrigger]=loadLogs(p2d)
 % retTrigger and encTrigger as output?!
 
 %trigger
@@ -20,54 +20,17 @@ TimeStampsTTL = TimeStampsTTL-TimeStampsTTL(1,1);
 %TimeStampsTTL = TimeStampsTTL./31.25; % convert from us to samples
 TimeStampsTTL = TimeStampsTTL./1e6; % convert from us to seconds
 events(:,1) = TimeStampsTTL'; % update event variable with new times (which are now in seconds starting at 0)
-
-% deletes 7s that appear within a 255 or 128 TTL
-last128 = find(events(:,2)==128);
-last255 = find(events(:,2)==255);
-
-% i don't know why the if statement is suddenly necessary when there are no
-% 128's or 255's
-if ~isempty(last128) || ~isempty(last255)
-    lastInit = max([last128(end), last255(end)]); % finds the last index at which a 128 or 225 TTL is sent
-else
-    lastInit= [];
-end
-
-a = find(events(:,2)==7);
-% i used this when we had another session in the same
-% recording and we had 128 and 255 TTl pulses afterwards because we tested
-% the trigger after a crashed experiment session anew
-% a(62:end)=[]; 
-
-% exclude this for P08ERL. Somehow 128 and 255 trigger are at the end of
-% the recording.
-if isempty(regexp(p2d,'P08ERL','ONCE')) % if it is not P08ERL, continue with L38, otherwise skip this part
-    if isempty(lastInit)
-        warning('No 128 or 255 TTL pulses');
-    else
-        a(a<=lastInit)=[]; % if there are no 128 or 255 TTL pulses, this line will result in an error
-    end
-end
-
+% TTLidx = find(events(:,2) == 7, 1); % on which index in the variable "events" do we have the trigger #7
+% 
 % % extract timestamp of the trial start
-trialStart = events(a,1); % on which index in the variable "events" do we have the trigger #7
-
-% only for P05_S4 (I had two sessions within one recording)
-% this setting (trialStart = trialStarta) is for S4; S5 does not yet
-% reconstruct properly (15.7.19)
-if ~isempty(regexp(p2d,'P05', 'ONCE')) && ~isempty(regexp(p2d,'S4', 'ONCE')) && isempty(regexp(p2d,'ERL', 'ONCE')) % P05_S4, not P05ERL_S4
-    % old from when two sessions were in the same recording
-    trialStarta = trialStart(1:98);
-    trialStartb = trialStart(99:196);
-    trialStart=trialStarta;
-end
+% for i=1:length(TTLidx)
+%     trialStart(i)=events(TTLidx(i),1);
+% end
+trialStart = events(events(:,2)==7,1);
 
 %% logfile
-% dir('*fVSp*txt'); % shows all logfiles in current directory
-% logFilename = input('What is the name of the Log-File? ', 's');
-
-mDir = dir('*fVSp*txt');
-logFilename = mDir.name;
+dir('*fVSp*txt'); % shows all logfiles in current directory
+logFilename = input('What is the name of the Log-File? ', 's');
 
 patientCode = logFilename(1:6); %for ERL suffix
 patientCode(regexp(patientCode,'_fV'):regexp(patientCode,'_fV')+2) = []; % delete part if there was no ERL suffix
@@ -82,7 +45,7 @@ numLogfiles = size(allLogfiles, 1);
 sessionNum(regexp(sessionNum,'_'))='-'; % changes '_' to a '-' so it does not mess up my title
 
 raw = [];
-for ixx=numLogfiles:-1:1 % this is not 1:numLogfiles because for whatever reason in P07ERL_S2 the later logfile is above the first logfile. I circumvent this by just reversing the call order in the following loop.
+for ixx=1:numLogfiles
 % this script imports the logfile into a nice table
 % Initialize variables.
 
@@ -113,73 +76,39 @@ end
 % Sometimes incomplete log files have usable trials. This new section
 % should harvest that data
 
-loglist = str2double(raw_temp(:,1));
+loglist=str2double(raw_temp(:,1));
 % finds out which trials are presented during encoding AND retrieval, saves this
 % information as a binary code into log_trialSave
-log_trialSave = zeros(size(loglist,1),1);
+log_trialSave=zeros(size(loglist,1),1);
 for i=1:size(loglist,1) % numLog/2 = trials according to logfile
-    if size(find(loglist == loglist(i)),1) == 2 % if the trial # appears two times in the logfile
-        log_trialSave(i) = 1;
+    if size(find(loglist==loglist(i)),1)==2
+        log_trialSave(i)=1;
     elseif isnan(loglist(i))
-        log_trialSave(i) = 1;
+        log_trialSave(i)=1;
     end
 end
 
-if ~isempty(regexp(p2d,'P09ERL','ONCE')) || ( ~isempty(regexp(p2d,'P07ERL','ONCE')) && ~isempty(regexp(p2d,'S1','ONCE')) ) % for P09ERL and P07ERL_S1
-    datalist=loglist;
-    datalist(isnan(datalist))=[];
-    data_trialSave = zeros(size(trialStart,1),1);
-    for i=1:size(datalist,1) % numLog/2 = trials according to logfile
-        if size(find(datalist==datalist(i)),1) == 2
-            data_trialSave(i)=1;
-        end
-    end
-
-else
-% CHECK IF TRUE ALL THE TIME!!
-% new implementation. here the default is to keep the ttl in, unless there
-% the trial appears twice (once in encoding and once in retrieval). because
-% in an incomplete logfile most trials will not have a retrieval trial
 datalist=loglist;
 datalist(isnan(datalist))=[];
-data_trialSave = ones(size(trialStart,1),1);
+data_trialSave=zeros(size(trialStart,1),1);
 for i=1:size(datalist,1) % numLog/2 = trials according to logfile
-    if size(find(datalist==datalist(i)),1) ~= 2
-        data_trialSave(i)=0;
+    if size(find(datalist==datalist(i)),1)==2
+        data_trialSave(i)=1;
     end
 end
-end
 
-% loglist is with nan's; datalist is basically triggers infered from logfile, without nans
-if ~isempty(regexp(p2d,'P05ERL','ONCE')) && ~isempty(regexp(p2d,'S1','ONCE')) % fix for P05ERLS1 (there was no trigger for the first trial)
-    delLog = find(loglist==1);
-    log_trialSave(delLog) = 0; % delete trial 1 encoding and retrieval from the logfile
-    
-    delTrig = find(datalist==1);
-    delTrig = delTrig(2)-1; % the first trigger got lost. because of that the corresponding trigger for retrieval-trial-1 is at position 30 instead of 31
-    data_trialSave(delTrig) = 0;
-end
-    
 % delete the entries in the logfiles that cannot be saved according to
 % log_trialSave:
-disp(sprintf('Deleting %d logfiles and %d TTL trigger', size(raw_temp(log_trialSave==0,:),1), size(trialStart(data_trialSave==0),1) ));
+disp(sprintf('Deleting %d logfiles and %d TTL trigger', size(raw_temp(log_trialSave==0,:),1), size(trialStart(data_trialSave==0),1)));
 raw_temp(log_trialSave==0,:)=[];
 trialStart(data_trialSave==0)=[];
 %%%
 
-raw = [raw; raw_temp];
+raw=[raw; raw_temp];
 end
 
-numTTL = size(trialStart,1);
-
-% old
-% numLog = max(str2double(raw_temp(:,1)) - length(find(log_trialSave==0)) )*2; % find the maximum number and multiply by two (one for encoding and retrieval each)
-
-if ~isempty(regexp(p2d,'P05ERL','ONCE')) && ~isempty(regexp(p2d,'S1','ONCE'))
-    numLog = numTTL; % numLog is not properly calculated because in P05ERL_S1 I take out a trial from the beginning. Calculating the number of logfile entries through the max number * 2 does not work because of that. This is a lazy fix.
-else
-    numLog = max(str2double(raw(:,1))*2); % find the maximum number and multiply by two (one for encoding and retrieval each)
-end
+numTTL=size(trialStart,1);
+numLog=max(str2double(raw_temp(:,1)) - length(find(log_trialSave==0)))*2; % find the maximum number and multiply by two (one for encoding and retrieval each)
 
 % there is more data than logfile entries. this implies that there was a 
 % previoius logfile with faulty data. therefore we prune the data files 
@@ -195,12 +124,12 @@ if numTTL~=numLog
     disp('Dude! Unterschiedliche Anzahl von TTL und Logfile Trigger');
     % find direction of difference
     if numTTL>numLog
-        disp('There are more TTL spikes than Logfile entries. This shouldn''t be - time to worry! (break at line l42)');
+        disp('There are more TTL spikes than Logfile entries. This shouldn''t be - time to worry! (break at line l14)');
         %         diffSize=numTTL-numLog;
         %         trialStart(1:diffSize)=[];
         return
     elseif numTTL<numLog
-        disp('There are more Logfile entries than TTL spikes. This is the time to worry! (break at line 147)');
+        disp('There are more Logfile entries than TTL spikes. This is the time to worry! (break at line 129)');
         return
     end
 end
@@ -215,26 +144,21 @@ for ix=1:size(raw,1)
 end
 
 %% Separate encoding and retrieval
-delLog=str2double(raw(:,1));
-
-while ~isnan(delLog(end-1)) % some logfiles (P09S03) do not have NaN values at the end. this is added here because this script relies on them
-    delLog(end+1)=NaN;
-end
-
+temp=str2double(raw(:,1));
 flag=0; % flag 0/1 -> encoding/retrieval
 blockcounter=1;
 idxEnc=[];
 idxRet=[];
-for ix=1:size(delLog,1)
+for ix=1:size(temp,1)
     if ix==1
         encBlock_start=1;
-    elseif isnan(delLog(ix)) && isnan(delLog(ix-1))
+    elseif isnan(temp(ix)) && isnan(temp(ix-1))
         encBlock_start=ix+1;
-    elseif isnan(delLog(ix)) && isnumeric(delLog(ix+1)) && flag==0 % encoding blocks
+    elseif isnan(temp(ix)) && isnumeric(temp(ix+1)) && flag==0 % encoding blocks
         idxEnc=[idxEnc; [encBlock_start:ix-1]'];
         flag=1;
         retBlock_start=ix+1;
-    elseif isnan(delLog(ix)) && flag==1 % retrieval blocks
+    elseif isnan(temp(ix)) && flag==1 % retrieval blocks
         idxRet=[idxRet; [retBlock_start:ix-1]'];
         flag=0;
         blockcounter=blockcounter+1;
@@ -312,34 +236,43 @@ for ia=1:size(respCorr,1)
     end
 end
 
-% trialChange - hits and misses
-% face and face
-delLog=[];
-counter=0;
-for ia=1:length(faceORplace)
-    if strcmp(faceORplace(ia,1),'f') && strcmp(faceORplace(ia,2),'f')
-        counter=counter+1;
-        delLog(ia,1)=counter;
-    end
-end
-
-% place and place
-for ia=1:length(faceORplace)
-    if strcmp(faceORplace(ia,1),'p') && strcmp(faceORplace(ia,2),'p')
-        counter=counter+1;
-        delLog(ia,1)=counter;
-    end
-end
-
-% face and place
-for ia=1:length(faceORplace)
-    if strcmp(faceORplace(ia,1),'f') && strcmp(faceORplace(ia,2),'p')
-        counter=counter+1;
-        delLog(ia,1)=counter;
-    end
-end
+% % trialChange - hits and misses
+% % face and face
+% temp=[];
+% counter=0;
+% for ia=1:length(faceORplace)
+%     if strcmp(faceORplace(ia,1),'f') && strcmp(faceORplace(ia,2),'f')
+%         counter=counter+1;
+%         temp(ia,1)=counter;
+%     end
+% end
+% 
+% % place and place
+% for ia=1:length(faceORplace)
+%     if strcmp(faceORplace(ia,1),'p') && strcmp(faceORplace(ia,2),'p')
+%         counter=counter+1;
+%         temp(ia,1)=counter;
+%     end
+% end
+% 
+% % face and place
+% for ia=1:length(faceORplace)
+%     if strcmp(faceORplace(ia,1),'f') && strcmp(faceORplace(ia,2),'p')
+%         counter=counter+1;
+%         temp(ia,1)=counter;
+%     end
+% end
+% 
+% for ia=1:length(temp)
+%     trialChange(ia,1)=find(temp==ia);
+% end
+% 
+% % hits after changetrial
+% hitsIdx_chTrial=trialChange(hitsIdx); % these are the hit trials after the changeTrial order switch
+% missIdx_chTrial=trialChange(missIdx);
 
 %% making the table
+% Encoding + CueLocked
 tempCell=[];
 trials=[];
 for i=1:allTrials
@@ -349,7 +282,23 @@ for i=1:allTrials
     tempCell{1,i}=value;
     tempCell{2,i}=faceORplace(i,3);
 end
-tableTemplate = cell2table(tempCell);
-tableTemplate.Properties.VariableNames = trials(1,:);
+encSpiketimes_cueLocked=cell2table(tempCell);
+encSpiketimes_cueLocked.Properties.VariableNames=trials(1,:);
+
+% Encoding + RespLocked
+encSpiketimes_respLocked=cell2table(tempCell);
+encSpiketimes_respLocked.Properties.VariableNames=trials(1,:);
+
+% Retrieval + CueLocked
+retSpiketimes_cueLocked=cell2table(tempCell);
+retSpiketimes_cueLocked.Properties.VariableNames=trials(1,:);
+
+% Retrieval + RespLocked
+retSpiketimes_respLocked=cell2table(tempCell);
+retSpiketimes_respLocked.Properties.VariableNames=trials(1,:);
+
+% % pretrial baseline
+% encSpikeNumbers_pretrial=double.empty;
+% retSpikeNumbers_pretrial=double.empty;
 
 end
