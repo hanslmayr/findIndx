@@ -88,12 +88,18 @@ for sbj = 1 : size(allSubj, 1)
     dtEnc = linspace(timeWindow(1),timeWindow(2),49);
     timeWindow = [-1 3];
     dtRet = linspace(timeWindow(1),timeWindow(2), (abs(timeWindow(1)) + abs(timeWindow(2))) *8+1 ); % steps of 125ms
-
+    
     for su = 1 : size(spksEnc,2) % single units
         % rasterplot
         clf % clear current figure window
         mFigH = figure(93);
-        subplot(3,2,1:2)
+        subplot(3,2,1)
+        
+        session = subjID;
+        session(regexp(subjID, '_'))='-'; % switch _ to -
+        mainTitle = sprintf(['Session: ', session, '  |  SU#%i'], su);
+        %         sgtitle(mainTitle); % we need at least R2018b
+        
         hold on
         n_encHit = [];
         counter1 = 0;
@@ -125,9 +131,22 @@ for sbj = 1 : size(allSubj, 1)
             end
             [n_encMiss(trl,:),~] = hist(x,dtEnc);
         end
-        line([-1 5], [counter1 counter1], 'LineStyle', '--', 'Color','k', 'LineWidth',1)
+        line([0 0],[0 counter1], 'LineStyle','-', 'Color',[0.6 0.6 0.6], 'LineWidth',3)
+        title('Encoding');
+        ylabel('Trial Number (re-sorted)');
+        ylim([0 counter1+1])
+        yticks(0:20:counter1+1);
+        mAx = gca;
+        mAx.YAxis.FontWeight = 'bold';
+        mAx.XAxis.FontWeight = 'bold';
+        mAx.FontSize = 12;
+        xlim([-1 5])
+%         box on
         
         % % RETRIEVAL - HIT
+        subplot(3,2,2)
+        hold on
+        counter1 = 0;
         n_retHit = [];
         for trl = hitsIdx(1):hitsIdx(end) % trials
             counter1 = counter1+1;
@@ -155,36 +174,33 @@ for sbj = 1 : size(allSubj, 1)
             end
             [n_retMiss(trl,:),~] = hist(x,dtRet);
         end
+        line([0 0],[0 counter1], 'LineStyle','-', 'Color',[0.6 0.6 0.6], 'LineWidth',3)
         
         ylabel('Trial Number (re-sorted)');
         ylim([0 counter1+1])
         yticks(0:20:counter1+1);
         
-        session = subjID;
-        session(regexp(subjID, '_'))='-'; % switch _ to -
-        mainTitle = sprintf(['Session: ', session, '  |  SU#%i'], su);
-        xlabelH = xlabel(mainTitle);
-        
-        xlabelH.Position = [2 200 -1];
         mAx = gca;
         mAx.YAxis.FontWeight = 'bold';
         mAx.XAxis.FontWeight = 'bold';
         mAx.FontSize = 12;
-        xlim([-1 5])
+        xlim([-1 3])
+        title('Retrieval');
+%         box on
         
-        hold on
-        L(1) = plot(nan, nan, 'b');
-        L(2) = plot(nan, nan, 'r');
-        L(3) = plot(nan, nan, 'c');
-        L(4) = plot(nan, nan, 'm');
-        [legPos, hobj, ~, ~] = legend(L, {'Enc - Hits', 'Enc - Misses', 'Ret - Hits', 'Ret - Misses'}, 'FontSize',8, 'FontWeight','bold');
-        hl = findobj(hobj,'type','line');
-        set(hl,'LineWidth',2);
-        set(legPos, 'Position', [0.825, 0.845, 0.09, 0.0929])
-        legend('boxoff');
+        %         hold on
+        %         L(1) = plot(nan, nan, 'b');
+        %         L(2) = plot(nan, nan, 'r');
+        %         L(3) = plot(nan, nan, 'c');
+        %         L(4) = plot(nan, nan, 'm');
+        %         [legPos, hobj, ~, ~] = legend(L, {'Enc - Hits', 'Enc - Misses', 'Ret - Hits', 'Ret - Misses'}, 'FontSize',8, 'FontWeight','bold');
+        %         hl = findobj(hobj,'type','line');
+        %         set(hl,'LineWidth',2);
+        %         set(legPos, 'Position', [0.91, 0.86, 0.06, 0.064])
+        %         legend('boxoff');
         
         %% frequency plot
-        sp2H = subplot(3,2,3:4);
+        sp2H = subplot(3,2,3);
         hold on
         frH = sum(n_encHit,1)./size(n_encHit,1)./0.125; % I have a bin each 250ms/transforms into herz
         frH([1 end]) = []; % cut off the wings
@@ -194,8 +210,20 @@ for sbj = 1 : size(allSubj, 1)
         plot(dtEnc,frH,'ks-','LineWidth',3, 'Color', 'b');
         plot(dtEnc,frM,'ks-','LineWidth',3, 'Color', 'r');
         xlim([-1 5])
-        line([0 0],[get(sp2H,'YLim')], 'LineStyle','--', 'Color','k', 'LineWidth',1.5)
+        [legPos, ~, ~, ~] = legend({'Enc - Hits', 'Enc - Misses'}, 'FontSize',8, 'FontWeight','bold');
+        set(legPos, 'Position', [0.4050 0.6326 0.0594 0.0337])
+        legend('boxoff');
+        xlabel('Time in Seconds')
+        ylabel('Frequency [Hz]');
+        mAxA = gca;
+        mAxA.YAxis.FontWeight = 'bold';
+        mAxA.XAxis.FontWeight = 'bold';
+        mAxA.FontSize = 12;
+        mAxA.XAxis.FontWeight = 'bold';
+        curYlimA = get(mAxA, 'YLim');
         
+        sp2bH = subplot(3,2,4);
+        hold on
         frH = sum(n_retHit,1)./size(n_retHit,1)./0.125; % I have a bin each 250ms/transforms into herz
         frH([1 end]) = []; % cut off the wings
         frM = sum(n_retMiss,1)./size(n_retMiss,1)./0.125;
@@ -203,20 +231,30 @@ for sbj = 1 : size(allSubj, 1)
         dtRet([1 end]) = []; % cut off the wings
         plot(dtRet,frH,'ks-','LineWidth',3, 'Color', 'c');
         plot(dtRet,frM,'ks-','LineWidth',3, 'Color', 'm');
-        line([0 0],[get(sp2H,'YLim')], 'LineStyle','--', 'Color','k', 'LineWidth',1.5)
+        [legPos, ~, ~, ~] = legend({'Ret - Hits', 'Ret - Misses'}, 'FontSize',8, 'FontWeight','bold');
+        set(legPos, 'Position', [0.8462 0.6326 0.0594 0.0337])
+        legend('boxoff');
         
-%         legend({'Enc - Hits', 'Enc - Misses', 'Ret - Hits', 'Ret - Misses'}, 'FontSize',8, 'FontWeight','bold')
-%         legend('boxoff');
+        
         xlabel('Time in Seconds')
         ylabel('Frequency [Hz]');
-        mAx = gca;
-        mAx.YAxis.FontWeight = 'bold';
-        mAx.XAxis.FontWeight = 'bold';
-        mAx.FontSize = 12;
-        mAx.XAxis.FontWeight = 'bold';
-        curYlim = get(mAx, 'YLim'); % sets minimum to 0
-        ylim([0 curYlim(2)]);
+        mAxB = gca;
+        mAxB.YAxis.FontWeight = 'bold';
+        mAxB.XAxis.FontWeight = 'bold';
+        mAxB.FontSize = 12;
+        mAxB.XAxis.FontWeight = 'bold';
+        curYlimB = get(mAxB, 'YLim'); % sets minimum to 0 % commenting this out leads to the retrieval frequency plot using the same y-axis as the encoding freqp
         
+        % set the YLim value for the both frequency plots to the maximum of either. This will lead to equal YLims as well as no cut-offs
+        mAxA.YLim = [0 max(curYlimA(2), curYlimB(2)) ];
+        mAxB.YLim = [0 max(curYlimA(2), curYlimB(2)) ];
+        
+        % draw grey lines
+        sp2H = subplot(3,2,3);
+        line([0 0],[get(sp2H,'YLim')], 'LineStyle','-', 'Color',[0.6 0.6 0.6], 'LineWidth',3)
+        
+        sp2bH = subplot(3,2,4);
+        line([0 0],[get(sp2bH,'YLim')], 'LineStyle','-', 'Color',[0.6 0.6 0.6], 'LineWidth',3)
         
         %% bar plot for average frequency
         % encoding
@@ -291,7 +329,7 @@ for sbj = 1 : size(allSubj, 1)
         mkdir('visuSU'); cd visuSU;
         set(mFigH,'units','normalized','OuterPosition',[-0.004 0.03 1.008 0.978], 'InnerPosition', [0 0.037 1 0.892]) % fullscreen
         saveas(gcf, ['visuSU_',subjID, '_SU',num2str(su)], 'jpg');
-
+        
         
     end
 end
