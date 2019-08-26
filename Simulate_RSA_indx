@@ -1,0 +1,40 @@
+% Simulate Single Neuron vs Assembly Code for Index
+
+% Generate Vectors of firing rates for neurons
+clear
+sparseness=10; % Numbers of idx neurons per trial
+ntrls=40;
+nneurons=ntrls+sparseness-1;
+enc=rand(nneurons,ntrls);% generate noise firing rate pattern vector for encoding
+ret=rand(nneurons,ntrls);% ... and for retrieval
+%idx=randperm(nneurons);
+idx=1:nneurons;
+nsess=40;
+RSA=zeros(ntrls,ntrls,nsess);
+for s=1:nsess
+    for k=1:ntrls
+        tempenc=enc(:,k);
+        tempret=ret(:,k);
+        pattern=rand(sparseness,1)+1;
+        tempenc(idx(k):idx(k)+sparseness-1)=pattern;
+        tempret(idx(k):idx(k)+sparseness-1)=pattern;
+        enc_mat(:,k)=tempenc;
+        ret_mat(:,k)=tempret;
+    end
+
+    %figure;subplot(2,2,1);imagesc(enc_mat);
+    %subplot(2,2,2);imagesc(ret_mat);
+
+    % Calculate RSA
+
+    for n=1:ntrls
+        tempenc=enc_mat(:,n);
+        for m=1:ntrls
+            tempret=ret_mat(:,m);
+            c=corrcoef(tempenc,tempret);
+            RSA(n,m,s)=c(2,1);
+        end
+    end
+end
+figure;
+imagesc(mean(RSA,3));colorbar
