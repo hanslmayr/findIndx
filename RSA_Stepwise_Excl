@@ -1,0 +1,30 @@
+% Examine effect of step-wise excusion of neurons on RSA
+clear
+load('Dat_Sp0.mat');
+nsess=size(enc_mat,3);
+nneurons=size(enc_mat,1);
+ntrls=size(enc_mat,2);
+
+for s=1:nsess
+    for k=1:ntrls
+        temp(:,1)=enc_mat(:,k,s);
+        temp(:,2)=ret_mat(:,k,s);
+        temp(:,3)=mean(temp,2);
+        temp=sortrows(temp,3);% sort temp based on averaged FR of enc and ret
+        temp=flipud(temp);
+        idx=1;
+        c=corrcoef(temp(:,1),temp(:,2));
+        RSA(idx,k,s)=c(2,1);
+        for n=1:nneurons-15
+            idx=idx+1;
+            c=corrcoef(temp(idx:end,1),temp(idx:end,2));
+            RSA(idx,k,s)=c(2,1);
+        end
+    end
+    
+end
+RSA=mean(RSA,3);
+
+figure;
+subplot(2,1,1);imagesc(RSA');
+subplot(2,1,2);plot(mean(RSA,2));
